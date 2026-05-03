@@ -1,0 +1,13 @@
+[PID 6847]: "Task 1 completed"
+[PID 6848]: total 52
+[PID 6848]: drwxrwxrwt  6 root root 36864 May  3 16:53 .
+[PID 6848]: drwxr-xr-x 35 root root  4096 May  3 16:41 ..
+[PID 6848]: drwxrwxrwx  2 root root    60 May  3 16:41 .X11-unix
+[PID 6848]: drwx------  2 root root  4096 May  3 16:41 snap-private-tmp
+[PID 6848]: drwx------  3 root root  4096 May  3 16:41 systemd-private-94ba62309ffe463bad52e2db83397c6b-systemd-logind.service-0OqIMR
+[PID 6848]: drwx------  3 root root  4096 May  3 16:41 systemd-private-94ba62309ffe463bad52e2db83397c6b-systemd-resolved.service-PinwZM
+[PID 6857]: Sun May  3 16:53:07 +0330 2026
+[PID 6858]: "All done"
+[PID 6849]: PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+[PID 6849]: --- 8.8.8.8 ping statistics ---
+[PID 6849]: 2 packets transmitted, 0 received, 100% packet loss, time 1009ms
