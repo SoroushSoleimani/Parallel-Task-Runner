@@ -64,3 +64,66 @@ max_concurrent_processes – a positive integer (N) that limits the number of si
 input_file – path to a text file containing shell commands, one per line.
 
 The program will execute each line as a separate command, output the results with PID prefixes, and exit only after all commands have completed.
+
+**Detailed Design & Code Structure**
+
+### Data Structures
+```bash
+typedef struct {
+    pid_t pid;
+    int pipe_fd;      // read end of the pipe for this child
+    char *command;    // optional: store the command for debugging
+} child_process_t;
+```
+### Example
+**1. Create an input file jobs.txt**
+```bash
+sleep 2
+echo "Task A Complete"
+ls -la /tmp
+echo "Task B Complete"
+pwd
+```
+**2. Execute with a maximum of 3 concurrent processes**
+```bash
+./task_executor 3 jobs.txt
+```
+**3. Example Output
+Because commands run in parallel, the exact order of lines depends on the OS scheduler. However, every output line is strictly prefixed with its executor’s PID. The output will appear similar to:**
+```bash
+[PID: 4051] Task A Complete
+[PID: 4052] total 12
+[PID: 4052] drwxrwxrwt 14 root root 4096 May 3 12:00 .
+[PID: 4052] drwxr-xr-x 20 root root 4096 May 1 09:00 ..
+[PID: 4053] Task B Complete
+[PID: 4054] /home/user/project
+```
+
+
+### Technical Constraints & Error Handling
+**Command failure handling** – If execvp fails (e.g., command not found), the child writes the error message (via perror) to the pipe because stderr is also redirected. The parent will print that message prefixed with the child’s PID.
+
+**File descriptor leaks** – The parent closes the unused write end of each pipe immediately after fork. The child closes the read end. The parent also closes each pipe’s read end after the child terminates and all output is consumed.
+
+**Zombie prevention** – Using waitpid with WNOHANG ensures that no zombie process remains. The parent reaps children the moment they exit.
+
+**Line buffering** – The output reading function handles partial lines and splits correctly, even if pipe reads break lines into multiple chunks.
+
+**Resource limits** – The program respects the user‑specified N. If N is too high (e.g., 1000), the OS’s process limit (ulimit -u) will eventually prevent further fork. The program reports fork failures and continues with remaining commands.
+
+**Signal safety** – The parent does not use signal() or sigaction(); it relies purely on non‑blocking polling. This avoids race conditions common with SIGCHLD handlers.
+
+## Performance Considerations
+**Polling vs. blocking** – The parent uses a small usleep (or select() on the pipe file descriptors) to reduce CPU usage. In a production version, you might use select() or epoll() to sleep until any pipe has data or any child exits, but the simple polling approach is sufficient for educational purposes and moderate workloads.
+
+**Memory usage** – The program stores at most N pipe file descriptors and child PIDs. No per‑command output buffering beyond the page‑size read buffer.
+
+**Scalability** – With N=100 and a fast input file, the scheduler remains responsive because waitpid is called immediately after each dispatch cycle.
+
+### License
+This project is open source and available under the MIT License.
+
+### Author
+Soroush Soleimani
+
+**For questions or contributions, please open an issue or submit a pull request on GitHub.**
