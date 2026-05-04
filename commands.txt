@@ -1,6 +1,5 @@
-sleep 2
+sleep 1
 echo "Task 1 completed"
 ls -la /tmp
-ping -c 2 8.8.8.8
 date
 echo "All done"
