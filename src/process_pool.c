@@ -20,7 +20,8 @@ int create_child_process(const char *command, int pipe_write_end, pid_t *pid) {
     return 0;
 }
 
-void reap_finished_processes(child_process_t *children, int *active_count, FILE *log_file) {
+void reap_finished_processes(child_process_t *children, int *active_count, 
+                             FILE *log_file, int *success_count, int *fail_count) {
     int status;
     pid_t finished_pid;
     for (int i = 0; i < *active_count; i++) {
@@ -28,6 +29,19 @@ void reap_finished_processes(child_process_t *children, int *active_count, FILE 
         if (finished_pid == children[i].pid) {
             read_and_log_output(log_file, children[i].pipe_fd, children[i].pid);
             close(children[i].pipe_fd);
+            
+            if (WIFEXITED(status)) {
+                int exit_code = WEXITSTATUS(status);
+                children[i].exit_status = exit_code;
+                if (exit_code == 0) {
+                    (*success_count)++;
+                } else {
+                    (*fail_count)++;
+                }
+            } else {
+                (*fail_count)++;
+            }
+            
             for (int j = i; j < *active_count - 1; j++) {
                 children[j] = children[j + 1];
             }
