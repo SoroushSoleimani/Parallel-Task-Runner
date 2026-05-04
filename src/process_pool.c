@@ -6,14 +6,14 @@
 #include <stdlib.h>
 
 int create_child_process(const char *command, int pipe_write_end, pid_t *pid) {
+    (void)command;     
+    (void)pipe_write_end; 
     pid_t p = fork();
     if (p == -1) {
         perror("fork");
         return -1;
     }
     if (p == 0) {
-        // child: will execute command (called from main after dup2)
-        // This function only returns in parent; child should not return here.
         return 0;
     }
     *pid = p;
