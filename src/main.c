@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <time.h>
 #include "process_pool.h"
 #include "log_manager.h"
 
@@ -61,16 +62,25 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+
     child_process_t children[MAX_PIDS];
     int active_count = 0;
     char command[MAX_CMD_LEN];
     bool end_of_file = false;
+
+    int total_commands = 0;
+    int success_count = 0;
+    int fail_count = 0;
 
     while (1) {
         if (!end_of_file && active_count < max_concurrent) {
             if (fgets(command, sizeof(command), input_file) != NULL) {
                 command[strcspn(command, "\n")] = '\0';
                 if (command[0] == '\0') continue;
+
+                total_commands++;  
 
                 int pipe_fds[2];
                 if (pipe(pipe_fds) == -1) {
@@ -91,18 +101,39 @@ int main(int argc, char *argv[]) {
                     close(pipe_fds[1]);
                     children[active_count].pid = pid;
                     children[active_count].pipe_fd = pipe_fds[0];
+                    children[active_count].exit_status = -1;
                     active_count++;
                 }
             } else {
                 end_of_file = true;
             }
         }
-        reap_finished_processes(children, &active_count, log_file);
+        reap_finished_processes(children, &active_count, log_file, &success_count, &fail_count);
+        
         if (end_of_file && active_count == 0) break;
         if (!end_of_file && active_count == max_concurrent) {
             usleep(10000);
         }
     }
+
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    double elapsed = (end_time.tv_sec - start_time.tv_sec) + 
+                     (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+
+    printf("\n========== EXECUTION REPORT ==========\n");
+    printf("Total commands:     %d\n", total_commands);
+    printf("Successful:         %d\n", success_count);
+    printf("Failed:             %d\n", fail_count);
+    printf("Total time:         %.3f seconds\n", elapsed);
+    printf("======================================\n");
+
+    fprintf(log_file, "\n========== EXECUTION REPORT ==========\n");
+    fprintf(log_file, "Total commands:     %d\n", total_commands);
+    fprintf(log_file, "Successful:         %d\n", success_count);
+    fprintf(log_file, "Failed:             %d\n", fail_count);
+    fprintf(log_file, "Total time:         %.3f seconds\n", elapsed);
+    fprintf(log_file, "======================================\n");
+    fflush(log_file);
 
     fclose(input_file);
     fclose(log_file);
