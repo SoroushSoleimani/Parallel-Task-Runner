@@ -7,10 +7,12 @@
 typedef struct child_process {
     pid_t pid;
     int pipe_fd;
+    int exit_status;
 } child_process_t;
 
 int create_child_process(const char *command, int pipe_write_end, pid_t *pid);
-void reap_finished_processes(child_process_t *children, int *active_count, FILE *log_file);
+void reap_finished_processes(child_process_t *children, int *active_count, 
+                             FILE *log_file, int *success_count, int *fail_count);
 void wait_for_all_children(child_process_t *children, int active_count, FILE *log_file);
 
 #endif
