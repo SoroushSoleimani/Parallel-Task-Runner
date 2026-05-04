@@ -4,13 +4,15 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
+#include <signal.h>
 #include "process_pool.h"
 #include "log_manager.h"
 
 #define MAX_CMD_LEN 1024
 #define MAX_PIDS 1000
 
-void execute_command(const char *command, int pipe_write_end) {
+// تابعی که در فرزند اجرا می‌شود: با تنظیم alarm و سپس exec
+void execute_command(const char *command, int pipe_write_end, double timeout_sec) {
     if (dup2(pipe_write_end, STDOUT_FILENO) == -1) {
         perror("dup2 stdout");
         exit(EXIT_FAILURE);
@@ -20,6 +22,11 @@ void execute_command(const char *command, int pipe_write_end) {
         exit(EXIT_FAILURE);
     }
     close(pipe_write_end);
+
+    // اگر تایم‌اوت فعال باشد، قبل از exec آلارم تنظیم کن
+    if (timeout_sec > 0) {
+        alarm(timeout_sec);   // بعد از timeout ثانیه SIGALRM می‌فرستد که باعث خاتمه فرزند می‌شود
+    }
 
     char *cmd_copy = strdup(command);
     if (!cmd_copy) {
@@ -62,8 +69,18 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    struct timespec start_time, end_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    // خواندن timeout از محیط
+    double timeout_sec = 0;
+    char *timeout_env = getenv("TIMEOUT");
+    if (timeout_env != NULL) {
+        timeout_sec = atof(timeout_env);
+        if (timeout_sec > 0) {
+            printf("Timeout enabled: %.1f seconds per command (using alarm)\n", timeout_sec);
+        }
+    }
+
+    struct timespec prog_start, prog_end;
+    clock_gettime(CLOCK_MONOTONIC, &prog_start);
 
     child_process_t children[MAX_PIDS];
     int active_count = 0;
@@ -80,7 +97,7 @@ int main(int argc, char *argv[]) {
                 command[strcspn(command, "\n")] = '\0';
                 if (command[0] == '\0') continue;
 
-                total_commands++;  
+                total_commands++;
 
                 int pipe_fds[2];
                 if (pipe(pipe_fds) == -1) {
@@ -94,10 +111,12 @@ int main(int argc, char *argv[]) {
                     close(pipe_fds[1]);
                     continue;
                 } else if (pid == 0) {
+                    // فرزند
                     close(pipe_fds[0]);
-                    execute_command(command, pipe_fds[1]);
+                    execute_command(command, pipe_fds[1], timeout_sec);
                     exit(EXIT_FAILURE);
                 } else {
+                    // والد
                     close(pipe_fds[1]);
                     children[active_count].pid = pid;
                     children[active_count].pipe_fd = pipe_fds[0];
@@ -108,17 +127,19 @@ int main(int argc, char *argv[]) {
                 end_of_file = true;
             }
         }
+
+        // جمع‌آوری فرزندان تمام شده
         reap_finished_processes(children, &active_count, log_file, &success_count, &fail_count);
-        
+
         if (end_of_file && active_count == 0) break;
         if (!end_of_file && active_count == max_concurrent) {
             usleep(10000);
         }
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    double elapsed = (end_time.tv_sec - start_time.tv_sec) + 
-                     (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
+    clock_gettime(CLOCK_MONOTONIC, &prog_end);
+    double elapsed = (prog_end.tv_sec - prog_start.tv_sec) +
+                     (prog_end.tv_nsec - prog_start.tv_nsec) / 1e9;
 
     printf("\n========== EXECUTION REPORT ==========\n");
     printf("Total commands:     %d\n", total_commands);

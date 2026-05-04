@@ -1,5 +1,2 @@
-sleep 1
-echo "Task 1 completed"
-ls -la /tmp
-date
-echo "All done"
+sleep 10
+echo "quick task"
