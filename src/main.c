@@ -11,7 +11,6 @@
 #define MAX_CMD_LEN 1024
 #define MAX_PIDS 1000
 
-// تابعی که در فرزند اجرا می‌شود: با تنظیم alarm و سپس exec
 void execute_command(const char *command, int pipe_write_end, double timeout_sec) {
     if (dup2(pipe_write_end, STDOUT_FILENO) == -1) {
         perror("dup2 stdout");
@@ -23,9 +22,8 @@ void execute_command(const char *command, int pipe_write_end, double timeout_sec
     }
     close(pipe_write_end);
 
-    // اگر تایم‌اوت فعال باشد، قبل از exec آلارم تنظیم کن
     if (timeout_sec > 0) {
-        alarm(timeout_sec);   // بعد از timeout ثانیه SIGALRM می‌فرستد که باعث خاتمه فرزند می‌شود
+        alarm(timeout_sec);   
     }
 
     char *cmd_copy = strdup(command);
@@ -69,7 +67,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // خواندن timeout از محیط
     double timeout_sec = 0;
     char *timeout_env = getenv("TIMEOUT");
     if (timeout_env != NULL) {
@@ -128,7 +125,6 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // جمع‌آوری فرزندان تمام شده
         reap_finished_processes(children, &active_count, log_file, &success_count, &fail_count);
 
         if (end_of_file && active_count == 0) break;
